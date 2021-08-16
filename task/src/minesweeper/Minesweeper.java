@@ -1,34 +1,47 @@
 package minesweeper;
 
+import java.util.Collections;
 import java.util.Random;
+import java.util.Stack;
 
 public class Minesweeper {
     private final String[][] field;
-    Random rnd;
+    private int mines;
+    private Random rnd;
 
-    public Minesweeper(int size) {
+    public Minesweeper(int mines) {
         field = new String[9][9];
-        for (int i = 0; i < size; i++) {
-            for (int j = 0; j < size; j++) {
+
+        for (int i = 0; i < field.length; i++) {
+            for (int j = 0; j < field.length; j++) {
                 field[i][j] = ".";
             }
         }
 
+        this.mines = mines;
+
         rnd = new Random();
-        populateField();
+        populateField(mines);
     }
 
-    private void populateField() {
+    private void populateField(int mines) {
+
+        Stack<String> stack = new Stack<>();
+
+        for (int i = 0; i < field.length* field.length - mines; i++) {
+            stack.push(".");
+        }
+
+        for (int i = 0; i < mines; i++) {
+            stack.push("X");
+        }
+
+        //Shuffle elements order
+        Collections.shuffle(stack);
+
         for (int i = 0; i < field.length; i++) {
             for (int j = 0; j < field.length; j++) {
-                int num = rnd.nextInt(6);
-
-                if (num == 0 ) {
-                    field[i][j] = "X";
-                } else {
-                    field[i][j] = ".";
-                }
-
+                field[i][j] = stack.pop();
             }
         }
     }
