@@ -11,10 +11,21 @@ public class Main {
         try {
             int mines = sc.nextInt();
             Minesweeper minesweeper = new Minesweeper(mines);
-            minesweeper.calculateAdjCells();
             minesweeper.printField();
+
+            while(!minesweeper.isFinished()) {
+                System.out.print("Set/delete mine marks (x and y coordinates): ");
+                int x = sc.nextInt();
+                int y = sc.nextInt();
+
+                minesweeper.markCell(x,y);
+                minesweeper.printField();
+                minesweeper.checkIfWon();
+            }
         } catch (Exception e) {
             e.printStackTrace();
         }
+
+
     }
 }
