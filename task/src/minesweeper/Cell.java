@@ -1,29 +1,27 @@
 package minesweeper;
 
+import java.util.ArrayDeque;
+import java.util.Queue;
+
 public class Cell {
     private String display;
-    private int adjMines;
+    private final Queue<Cell> allAdjacentCells;
+    private final Queue<Cell> adjCellsWithMines;
     private Status status;
     private final boolean mine;
 
     public Cell(String display) {
         this.display = display;
-        this.adjMines = 0;
+        this.allAdjacentCells = new ArrayDeque<>();
+        this.adjCellsWithMines = new ArrayDeque<>();
 
         if (display.equals("X")) {
-            status = Status.MINE;
+            status = Status.UNMARKED;
             this.mine = true;
             setDisplay(".");
         } else {
             status = Status.UNMARKED;
             this.mine = false;
-        }
-    }
-
-    public void setStatus(String display) {
-        if (!display.equals("0")) {
-            setDisplay(display);
-            status = Status.NUMBER;
         }
     }
 
@@ -35,15 +33,23 @@ public class Cell {
         this.display = display;
     }
 
-    public int getAdjMines() {
-        return adjMines;
+    public int getAdjCellsWithMines() {
+        return adjCellsWithMines.size();
     }
 
-    public void addMine() {
-        this.adjMines++;
+    public void addMine(Cell cellWithMines) {
+        this.adjCellsWithMines.add(cellWithMines);
     }
 
-    public boolean isMine(){
+    public void addAdjacentCell(Cell adjacentCell) {
+        this.allAdjacentCells.add(adjacentCell);
+    }
+
+    public Queue<Cell> getAllAdjacentCells() {
+        return allAdjacentCells;
+    }
+
+    public boolean isMine() {
         return this.mine;
     }
 
@@ -52,7 +58,26 @@ public class Cell {
     }
 
     public boolean isNumber() {
-        return status == Status.NUMBER;
+        return adjCellsWithMines.size() > 0;
+    }
+
+    public boolean isExplored() {
+        return status == Status.EXPLORED;
+    }
+
+    public void exploreCell() {
+        if (status == Status.EXPLORED) {
+            return;
+        }
+        status = Status.EXPLORED;
+
+        if (isMine()) {
+            setDisplay("X");
+        } else if (getAdjCellsWithMines() == 0) {
+            setDisplay("/");
+        } else {
+            setDisplay(String.valueOf(getAdjCellsWithMines()));
+        }
     }
 
     public void markCell() {
@@ -67,9 +92,8 @@ public class Cell {
 }
 
 enum Status {
-    MINE,
-    NUMBER,
     UNMARKED,
-    MARKED
+    MARKED,
+    EXPLORED
 }
 

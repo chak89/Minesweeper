@@ -1,58 +1,152 @@
 package minesweeper;
 
-import java.util.Collections;
-import java.util.Scanner;
-import java.util.Stack;
+import java.util.*;
 
 public class Minesweeper {
     private final Cell[][] field;
-    private boolean finished;
+    private final int mines;
+    Status status;
+
+    public enum Status {
+        START,
+        PROGRESS,
+        WON,
+        LOST
+    }
 
     public Minesweeper(int mines) {
         field = new Cell[9][9];
-        this.finished = false;
+        status = Status.START;
+        this.mines = mines;
         populateField(mines);
         calculateAdjCells();
     }
 
-    public boolean isFinished() {
-        return finished;
+    public Status status() {
+        return status;
     }
 
     public void checkIfWon() {
+        int matches = 0;
+        //All mines are marked
         for (int y = 0; y < field.length; y++) {
             for (int x = 0; x < field.length; x++) {
                 Cell cell = field[y][x];
-                if ((cell.isMine() && !cell.isMarked() || !cell.isMine() && cell.isMarked())) {
-                    return;
+                if (cell.isMine() && cell.isMarked()) {
+                    matches++;
+                    if (matches == this.mines) {
+                        this.status = Status.WON;
+                    }
                 }
             }
         }
-        this.finished = true;
-        System.out.println("Congratulations! You found all the mines!");
+
+        matches = 0;
+        //All safe cells are opened
+        for (int y = 0; y < field.length; y++) {
+            for (int x = 0; x < field.length; x++) {
+                Cell cell = field[y][x];
+                if (!cell.isMine() && cell.isExplored()) {
+                    matches++;
+                    if (matches == (field.length * field.length) - mines) {
+                        this.status = Status.WON;
+                    }
+                }
+            }
+        }
+
     }
 
-    public void markCell(int x, int y) {
 
-        //If cell contains a number already
-        while(field[y-1][x-1].isNumber()) {
-            Scanner sc = new Scanner(System.in);
-            System.out.println("There is a number here!");
-            System.out.print("Set/delete mine marks (x and y coordinates): ");
-            x = sc.nextInt();
-            y = sc.nextInt();
+    public void inputCommand(int x, int y, String command) {
+        //Explore a cell
+        if (command.equals("free")) {
+            exploreCell(x, y);
         }
 
-        //If cell is not a number or marked
-        if (!field[y - 1][x - 1].isMarked()) {
-            field[y - 1][x - 1].markCell();
+        //Mark/unmark unexplored cells with *
+        if (command.equals("mine")) {
+            markAndUnmarkCell(x, y);
         }
 
+//        if (status == Status.START) {
+//            return;
+//        }
+//
+        if(status == Status.LOST) {
+            return;
+        }
+        checkIfWon();
+    }
+
+
+    public void exploreCell(int x, int y) {
+
+        //If cell is empty and doesn't have mines around
+        if (!field[y - 1][x - 1].isMine() && field[y - 1][x - 1].getAdjCellsWithMines() == 0) {
+
+            status = Status.PROGRESS;
+            Queue<Cell> emptyAdjCells = field[y - 1][x - 1].getAllAdjacentCells();
+            field[y - 1][x - 1].exploreCell();
+
+            for (Cell cell : emptyAdjCells) {
+                exploreAdjacentCells(cell);
+            }
+
+        }
+        //If cell is empty and has mines around it
+        else if (!field[y - 1][x - 1].isMine() && field[y - 1][x - 1].isNumber()) {
+            field[y - 1][x - 1].exploreCell();
+            status = Status.PROGRESS;
+        }
+        //If cell contains mine
+        else if (field[y - 1][x - 1].isMine()) {
+            field[y - 1][x - 1].exploreCell();
+
+//            if (status == Status.START) {
+//                System.out.println("Hitted X on first run");
+//                populateField(this.mines);
+//                calculateAdjCells();
+//                exploreCell(x,y);
+//                return;
+//            }
+
+            this.status = Status.LOST;
+        }
+    }
+
+
+    //Explore all adjacent empty cells.
+    public void exploreAdjacentCells(Cell cell) {
+        if (!cell.isMine() && cell.getAdjCellsWithMines() == 0) {
+            cell.exploreCell();
+            Queue<Cell> emptyAdjCells2 = cell.getAllAdjacentCells();
+
+            for (Cell cell2 : emptyAdjCells2) {
+                if (!cell2.isExplored()) {
+                    exploreAdjacentCells(cell2);
+                }
+            }
+        }
+        cell.exploreCell();
+    }
+
+
+    //Mark/unmark unexplored cells with *
+    public void markAndUnmarkCell(int x, int y) {
+
+        //If cell is already explored, then return
+        if (field[y - 1][x - 1].isExplored()) {
+            System.out.println("Cell is already explored");
+        }
         //If cell is marked
         else if (field[y - 1][x - 1].isMarked()) {
             field[y - 1][x - 1].unmarkCell();
         }
-
+        //If cell is unmarked
+        else if (!field[y - 1][x - 1].isMarked()) {
+            field[y - 1][x - 1].markCell();
+        }
     }
 
 
@@ -63,6 +157,7 @@ public class Minesweeper {
 
                 Cell cell = field[y][x];
 
+                //As long as this cell does not contain a mine, do the adjacent mines check
                 if (!cell.isMine()) {
                     checkCellRight(cell, x, y);
                     checkCellDiagonalDownRight(cell, x, y);
@@ -72,7 +167,6 @@ public class Minesweeper {
                     checkCellDiagonalUpLeft(cell, x, y);
                     checkCellUp(cell, x, y);
                     cellCellDiagonalUpRight(cell, x, y);
-                    cell.setStatus(String.valueOf(cell.getAdjMines()));
                 }
             }
         }
@@ -80,71 +174,79 @@ public class Minesweeper {
 
     //Check cell to the right
     private void checkCellRight(Cell cell, int x, int y) {
-        if (x + 1 <= field.length - 1 && field[y][x + 1].isMine()) {
-            cell.addMine();
+        if (x + 1 <= field.length - 1) {
+            if (field[y][x + 1].isMine()) {
+                cell.addMine(field[y][x + 1]);
+            }
+            cell.addAdjacentCell(field[y][x + 1]);
         }
-        //System.out.println("Cell to the right is out of bound");
     }
 
     //Check cell to the down diagonal-right
     private void checkCellDiagonalDownRight(Cell cell, int x, int y) {
         if ((x + 1) <= field.length - 1 && (y + 1) <= field.length - 1) {
             if (field[y + 1][x + 1].isMine()) {
-                cell.addMine();
+                cell.addMine(field[y + 1][x + 1]);
             }
-            //System.out.println("Cell to the down diagonal-right is out of bound");
+            cell.addAdjacentCell(field[y + 1][x + 1]);
         }
     }
 
     //Check cell down from this cell
     private void checkCellDown(Cell cell, int x, int y) {
-        if (y + 1 <= field.length - 1 && field[y + 1][x].isMine()) {
-            cell.addMine();
+        if (y + 1 <= field.length - 1) {
+            if (field[y + 1][x].isMine()) {
+                cell.addMine(field[y + 1][x]);
+            }
+            cell.addAdjacentCell(field[y + 1][x]);
         }
-        //System.out.println("Cell down is out of bound");
     }
 
     //Check cell to lower diagonal-left
     private void checkCellDiagonalDownLeft(Cell cell, int x, int y) {
         if ((y + 1) <= field.length - 1 && (x - 1) >= 0) {
             if (field[y + 1][x - 1].isMine()) {
-                cell.addMine();
+                cell.addMine(field[y + 1][x - 1]);
             }
-            //System.out.println("Cell to the down diagonal-left is out of bound");
+            cell.addAdjacentCell(field[y + 1][x - 1]);
         }
     }
 
     private void checkCellLeft(Cell cell, int x, int y) {
-        if ((x - 1) >= 0 && field[y][x - 1].isMine()) {
-            cell.addMine();
+        if ((x - 1) >= 0) {
+            if (field[y][x - 1].isMine()) {
+                cell.addMine(field[y][x - 1]);
+            }
+            cell.addAdjacentCell(field[y][x - 1]);
         }
-        //System.out.println("Cell to the left is out of bound");
     }
 
     //Check cell to the upper diagonal-left
     private void checkCellDiagonalUpLeft(Cell cell, int x, int y) {
         if ((x - 1) >= 0 && (y - 1) >= 0) {
             if (field[y - 1][x - 1].isMine()) {
-                cell.addMine();
+                cell.addMine(field[y - 1][x - 1]);
             }
-            //System.out.println("Cell to the upper diagonal-left is out of bound");
+            cell.addAdjacentCell(field[y - 1][x - 1]);
         }
     }
 
     //Check cell up
     private void checkCellUp(Cell cell, int x, int y) {
-        if (y - 1 >= 0 && field[y - 1][x].isMine()) {
-            cell.addMine();
+        if (y - 1 >= 0) {
+            if (field[y - 1][x].isMine()) {
+                cell.addMine(field[y - 1][x]);
+            }
+            cell.addAdjacentCell(field[y - 1][x]);
         }
-        //System.out.println("Cell up is out of bound");
     }
 
     private void cellCellDiagonalUpRight(Cell cell, int x, int y) {
         if ((x + 1) <= field.length - 1 && (y - 1) >= 0) {
             if (field[y - 1][x + 1].isMine()) {
-                cell.addMine();
+                cell.addMine(field[y - 1][x + 1]);
             }
-            //System.out.println("Cell to the up diagonal-right is out of bound");
+            cell.addAdjacentCell(field[y - 1][x + 1]);
         }
     }
 
